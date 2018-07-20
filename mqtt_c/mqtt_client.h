@@ -46,6 +46,7 @@ typedef struct {
     uint16_t last_subscribe_id;
 
     unsigned int keepalive_sec;
+    unsigned int timeout_sec;
     SocketHAL socket;
     TimestampFunc time_func;
     OnMessageCallback on_message_cb;
@@ -85,11 +86,19 @@ typedef struct {
  * @param keepalive The maximum keepalive timeout in seconds.
  *                  Keepalive (MQTT PINGREQ) packets will be sent while idle,
  *                  at least as frequent as this timeout.
+ *
+ * @param timeout   This timeout relates to how long the MQTT client will wait
+ *                  before giving up and assuming the network is down.
+ *                  The timeout (in seconds) should be larger than the largest 
+ *                  amount of expected network latency. A larger timeout has no
+ *                  effect on performance in normal network conditions.
+ *                  Recommended value: > 5 seconds.
+ *
  */
 void MQTT_client_init(MQTTClient *ctx,
         SocketHAL socket, TimestampFunc time_func,
         OnMessageCallback message_callback, void *message_callback_ctx,
-        unsigned int keepalive_sec);
+        unsigned int keepalive_sec, unsigned int timeout_sec);
 
 /**
  * Set logging functions

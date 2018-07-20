@@ -53,18 +53,23 @@ typedef struct {
  * If a state stays 'stuck' for more than its timeout time,
  * the state machine goes to error -> closing -> closed.
  * Some states have timeout=0: they never timeout.
+ *
+ * Note: the timeout values are multiplied with the timeout value
+ * passed to MQTT_client_init(). Example: if MQTT_client_init() is called
+ * with a timeout value of 10 seconds, a state with timeout=2 will have a
+ * timeout of 2*10=20 seconds.
  */
-#define STATE_TIME (5)
+
 static const State g_state[] = {
     [MQTT_CLOSED]       = {.run = state_closed,         .timeout = 0},
-    [MQTT_CONNECTING]   = {.run = state_connecting,     .timeout = STATE_TIME},
+    [MQTT_CONNECTING]   = {.run = state_connecting,     .timeout = 2},
     [MQTT_IDLE]         = {.run = state_idle,           .timeout = 0},
-    [MQTT_PING]         = {.run = state_ping,           .timeout = STATE_TIME},
-    [MQTT_ERROR]        = {.run = state_error,          .timeout = STATE_TIME},
-    [MQTT_CLOSING]      = {.run = state_closing,        .timeout = STATE_TIME},
-    [MQTT_PUBLISH]      = {.run = state_publish,        .timeout = STATE_TIME},
-    [MQTT_SUBSCRIBE]    = {.run = state_subscribe,      .timeout = STATE_TIME},
-    [MQTT_RECEIVING]    = {.run = state_receiving,      .timeout = STATE_TIME},
+    [MQTT_PING]         = {.run = state_ping,           .timeout = 1},
+    [MQTT_ERROR]        = {.run = state_error,          .timeout = 1},
+    [MQTT_CLOSING]      = {.run = state_closing,        .timeout = 1},
+    [MQTT_PUBLISH]      = {.run = state_publish,        .timeout = 1},
+    [MQTT_SUBSCRIBE]    = {.run = state_subscribe,      .timeout = 1},
+    [MQTT_RECEIVING]    = {.run = state_receiving,      .timeout = 1},
 };
 #define NUM_STATES (sizeof(g_state)/sizeof(g_state[0]))
 
@@ -72,7 +77,7 @@ static const State g_state[] = {
 void MQTT_client_init(MQTTClient *ctx,
         SocketHAL socket, TimestampFunc time_func,
         OnMessageCallback message_callback, void *message_callback_ctx,
-        unsigned int keepalive_sec)
+        unsigned int keepalive_sec, unsigned int timeout_sec)
 {
     ctx->prev_state = MQTT_CLOSED;
     ctx->state = MQTT_CLOSED;
@@ -81,6 +86,7 @@ void MQTT_client_init(MQTTClient *ctx,
     ctx->last_subscribe_id = 0;
 
     ctx->keepalive_sec = keepalive_sec;
+    ctx->timeout_sec = timeout_sec;
     ctx->socket = socket;
     ctx->time_func = time_func;
     ctx->on_message_cb = message_callback;
@@ -301,9 +307,10 @@ static void handle_state_machine(MQTTClient *ctx,
     State state = g_state[ctx->state];
     if(state.timeout) {
         const int diff = ctx->time_func() - ctx->timestamp_timeout;
-        if(diff >= state.timeout) {
+        const int max_diff = (state.timeout * ctx->timeout_sec);
+        if(diff >= max_diff) {
             ctx->log_warning("MQTT: state %s timeout (%d/%d sec)",
-                    state_to_str(ctx->state), diff, state.timeout);
+                    state_to_str(ctx->state), diff, max_diff);
 
             // edge case: break loop in case of timeout during error/closing
             if(ctx->state == MQTT_CLOSING) {
