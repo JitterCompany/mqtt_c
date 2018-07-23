@@ -559,6 +559,11 @@ static void state_receiving(MQTTClient *ctx,
         topic_name[t_len] = '\0';
         topic = topic_name;
     }
+    
+    // keep track of the 'old' prev_state, to detect if the message_cb
+    // changes the state
+    const enum MQTTState prev_state = ctx->prev_state;
+
     if(ctx->on_message_cb) {
         ctx->on_message_cb(ctx->on_message_cb_ctx, topic,
                 payload, (size_t)sizeof_payload);
@@ -567,6 +572,10 @@ static void state_receiving(MQTTClient *ctx,
                 "but no callback is registered!");
     }
 
-    set_state(ctx, ctx->prev_state);
+    // return to the previous state, unless the state is already modified
+    // by the on_message_cb().
+    if(ctx->prev_state == prev_state) {
+        set_state(ctx, ctx->prev_state);
+    }
 }
 
