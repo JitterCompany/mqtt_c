@@ -186,7 +186,7 @@ void MQTT_client_disconnect(MQTTClient *ctx)
     set_state(ctx, MQTT_CLOSING);
 }
 
-void MQTT_client_poll(MQTTClient *ctx)
+bool MQTT_client_poll(MQTTClient *ctx)
 {
     int rx_packet_type = 0;
     if(ctx->state != MQTT_CLOSED) {
@@ -214,6 +214,7 @@ void MQTT_client_poll(MQTTClient *ctx)
     }
 
     handle_state_machine(ctx, false, rx_packet_type);
+    return (ctx->state == MQTT_IDLE);
 }
 
 bool MQTT_client_publish(MQTTClient *ctx, const char *topic,

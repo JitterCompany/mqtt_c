@@ -164,8 +164,11 @@ void MQTT_client_disconnect(MQTTClient *ctx);
  * Poll: advance the internal state machine when possible
  *
  * Make sure to call this regularly.
+ *
+ * @return True means the client is 'idle': it is ready for a publish
+ * or subscribe.
  */
-void MQTT_client_poll(MQTTClient *ctx);
+bool MQTT_client_poll(MQTTClient *ctx);
 
 
 /**
