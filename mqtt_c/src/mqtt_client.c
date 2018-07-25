@@ -537,13 +537,13 @@ static void state_receiving(MQTTClient *ctx,
     uint8_t retained;
     unsigned short msgid;
     MQTTString mqtt_topic;
-    uint8_t *payload;
+    uint8_t *payload = NULL;
     int sizeof_payload = 0;
     const int ok = MQTTDeserialize_publish(&dup, &qos, &retained,
             &msgid, &mqtt_topic, &payload, &sizeof_payload,
             ctx->read_buffer, sizeof(ctx->read_buffer));
 
-    if((ok != 1) || (!sizeof_payload)) {
+    if(ok != 1) {
         ctx->log_warning("MQTT: receiving PUBLISH failed!");
         set_state(ctx, MQTT_ERROR);
         return;

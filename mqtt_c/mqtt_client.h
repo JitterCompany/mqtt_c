@@ -24,6 +24,7 @@ enum MQTTPingState {
     MQTT_PING_BUSY,
 };
 
+// NOTE: payload may be NULL if a message without payload is received
 typedef void (*OnMessageCallback)(void *cb_ctx, const char *topic,
         uint8_t *payload, const size_t sizeof_payload);
 
