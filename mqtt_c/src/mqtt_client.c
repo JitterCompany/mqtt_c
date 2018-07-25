@@ -392,7 +392,10 @@ static void set_state(MQTTClient *ctx, enum MQTTState new_state)
 static void state_closed(MQTTClient *ctx,
         const bool first_time, const int incoming_packet_type)
 {
-    ctx->ping = MQTT_PING_IDLE;
+    if(first_time) {
+        buffered_write_reinit(&ctx->writer);
+        ctx->ping = MQTT_PING_IDLE;
+    }
 }
 static void state_connecting(MQTTClient *ctx,
         const bool first_time, const int incoming_packet_type)

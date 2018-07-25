@@ -11,6 +11,11 @@ void buffered_write_init(BufferedWrite *ctx,
     ctx->size = sizeof_buffer;
     ctx->buffer = buffer;
 
+    buffered_write_reinit(ctx);
+}
+
+void buffered_write_reinit(BufferedWrite *ctx)
+{
     ctx->ptr = ctx->buffer;
     ctx->count = 0;
 }

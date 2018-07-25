@@ -19,6 +19,14 @@ void buffered_write_init(BufferedWrite *ctx,
         SocketWriteFunc writer, void *writer_ctx,
     uint8_t *buffer, size_t sizeof_buffer);
 
+
+/**
+ * Re-initialize a BufferedWrite instance.
+ *
+ * Same as calling buffered_write_init() again with the same parameters.
+ */
+void buffered_write_reinit(BufferedWrite *ctx);
+
 /**
  * Wraps a SocketWriteFunc to write all-or-nothing without copying overhead
  *
