@@ -124,15 +124,20 @@ bool MQTT_client_connect(MQTTClient *ctx, const char *hostname,
         const char *username, const char *password)
 {
     if(ctx->state != MQTT_CLOSED) {
+        ctx->log_warning("MQTT: failed to connect (not closed)");
         return false;
     }
 
     if(!ctx->socket.open(ctx->socket.ctx, hostname, port)) {
         return false;
     }
+    // the socket is opened, so the state from here on is 'connecting'.
+    // If anything after this point fails, remember to close the socket!
 
     uint8_t *buffer = buffered_write_ptr(&ctx->writer);
     if(!buffer) {
+        ctx->log_warning("MQTT: failed to connect (could not get buffer)");
+        ctx->socket.close(ctx->socket.ctx);
         return false;
     }
     const size_t sizeof_buffer = buffered_write_max_size(&ctx->writer);
@@ -146,6 +151,8 @@ bool MQTT_client_connect(MQTTClient *ctx, const char *hostname,
 
     const int len = MQTTSerialize_connect(buffer, sizeof_buffer, &data);
     if(!buffered_write_commit(&ctx->writer, len)) {
+        ctx->log_warning("MQTT: failed to connect (could not commit buffer)");
+        ctx->socket.close(ctx->socket.ctx);
         return false;
     }
     set_state(ctx, MQTT_CONNECTING);
