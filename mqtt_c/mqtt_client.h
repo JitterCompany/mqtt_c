@@ -38,6 +38,13 @@ struct MQTTTransportStorage{
 };
 
 typedef struct {
+    const char *topic;
+    void *payload;
+    size_t sizeof_payload;
+    bool retain;
+} MQTTWill;
+
+typedef struct {
     enum MQTTState prev_state;
     enum MQTTState state;
     enum MQTTPingState ping;
@@ -123,6 +130,9 @@ void MQTT_client_set_logging(MQTTClient *ctx,
  * @param password      Username and password for authenticating to the broker.
  *                      Set to NULL to connect as anonymous user.
  *
+ * @param will          Will settings: create a MQTTWill struct with
+ *                      the desired will parameters, or pass NULL to disable.
+ *
  * NOTE: This is non-blocking.
  * Connecting is finished when MQTT_client_is_connected() returns true.
  * If MQTT_client_is_disconnected() returns true, the connection failed
@@ -130,7 +140,8 @@ void MQTT_client_set_logging(MQTTClient *ctx,
  */
 bool MQTT_client_connect(MQTTClient *ctx, const char *hostname,
         const int port, const char *client_id,
-        const char *username, const char *password);
+        const char *username, const char *password,
+        const MQTTWill *will);
 
 /**
  * Check if the client is connected

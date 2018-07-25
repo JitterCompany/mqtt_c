@@ -121,7 +121,8 @@ void MQTT_client_set_logging(MQTTClient *ctx,
 
 bool MQTT_client_connect(MQTTClient *ctx, const char *hostname,
         const int port, const char *client_id,
-        const char *username, const char *password)
+        const char *username, const char *password,
+        const MQTTWill *will)
 {
     if(ctx->state != MQTT_CLOSED) {
         ctx->log_warning("MQTT: failed to connect (not closed)");
@@ -148,6 +149,19 @@ bool MQTT_client_connect(MQTTClient *ctx, const char *hostname,
 	data.cleansession = 1;
     data.username.cstring = (char*)username;
     data.password.cstring = (char*)password;
+    if(will) {
+        MQTTString will_msg = MQTTString_initializer;
+        if(will->payload && will->sizeof_payload) {
+            will_msg.lenstring.data = will->payload;
+            will_msg.lenstring.len = will->sizeof_payload;
+        }
+        MQTTString will_topic = MQTTString_initializer;
+        will_topic.cstring = (char*)will->topic;
+        data.willFlag = 1;
+        data.will.topicName = will_topic;
+        data.will.message = will_msg;
+        data.will.retained = will->retain;
+    }
 
     const int len = MQTTSerialize_connect(buffer, sizeof_buffer, &data);
     if(!buffered_write_commit(&ctx->writer, len)) {
