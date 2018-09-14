@@ -31,6 +31,8 @@ static void state_ping(MQTTClient *ctx,
         const bool first_time, const int incoming_packet_type);
 static void state_error(MQTTClient *ctx,
         const bool first_time, const int incoming_packet_type);
+static void state_pre_closing(MQTTClient *ctx,
+        const bool first_time, const int incoming_packet_type);
 static void state_closing(MQTTClient *ctx,
         const bool first_time, const int incoming_packet_type);
 static void state_publish(MQTTClient *ctx,
@@ -51,7 +53,7 @@ typedef struct {
  * This table maps states to their handler functions.
  *
  * If a state stays 'stuck' for more than its timeout time,
- * the state machine goes to error -> closing -> closed.
+ * the state machine goes to error -> pre_closing -> closing -> closed.
  * Some states have timeout=0: they never timeout.
  *
  * Note: the timeout values are multiplied with the timeout value
@@ -62,10 +64,11 @@ typedef struct {
 
 static const State g_state[] = {
     [MQTT_CLOSED]       = {.run = state_closed,         .timeout = 0},
-    [MQTT_CONNECTING]   = {.run = state_connecting,     .timeout = 2},
+    [MQTT_CONNECTING]   = {.run = state_connecting,     .timeout = 4},
     [MQTT_IDLE]         = {.run = state_idle,           .timeout = 0},
     [MQTT_PING]         = {.run = state_ping,           .timeout = 1},
     [MQTT_ERROR]        = {.run = state_error,          .timeout = 1},
+    [MQTT_PRE_CLOSING]  = {.run = state_pre_closing,    .timeout = 1},
     [MQTT_CLOSING]      = {.run = state_closing,        .timeout = 1},
     [MQTT_PUBLISH]      = {.run = state_publish,        .timeout = 1},
     [MQTT_SUBSCRIBE]    = {.run = state_subscribe,      .timeout = 1},
@@ -179,6 +182,7 @@ bool MQTT_client_is_connected(MQTTClient *ctx)
         case MQTT_CLOSED:
         case MQTT_CONNECTING:
         case MQTT_ERROR:
+        case MQTT_PRE_CLOSING:
         case MQTT_CLOSING:
             return false;
         case MQTT_IDLE:
@@ -201,10 +205,12 @@ bool MQTT_client_is_disconnected(MQTTClient *ctx)
 
 void MQTT_client_disconnect(MQTTClient *ctx)
 {
-    if(ctx->state == MQTT_CLOSED) {
+    if((ctx->state == MQTT_CLOSED) || (ctx->state == MQTT_CLOSING)) {
+
+        // Avoid loops: connection is already going to close.
         return;
     }
-    set_state(ctx, MQTT_CLOSING);
+    set_state(ctx, MQTT_PRE_CLOSING);
 }
 
 bool MQTT_client_poll(MQTTClient *ctx)
@@ -215,8 +221,11 @@ bool MQTT_client_poll(MQTTClient *ctx)
         if(buffered_write_flush(&ctx->writer) < 0) {
             ctx->log_debug("MQTT: buffered_write_flush() failed");
             // if flush fails during closing, assume the connection is closed
-            if(ctx->state == MQTT_CLOSING) {
+            if(ctx->state == MQTT_PRE_CLOSING) {
+                set_state(ctx, MQTT_CLOSING);
+            } else if(ctx->state == MQTT_CLOSING) {
                 set_state(ctx, MQTT_CLOSED);
+
             } else {
                 set_state(ctx, MQTT_ERROR);
             }
@@ -335,6 +344,10 @@ static void handle_state_machine(MQTTClient *ctx,
                     state_to_str(ctx->state), diff, max_diff);
 
             // edge case: break loop in case of timeout during error/closing
+            if(ctx->state == MQTT_PRE_CLOSING) {
+                set_state(ctx, MQTT_CLOSED);
+                return;
+            }
             if(ctx->state == MQTT_CLOSING) {
                 set_state(ctx, MQTT_CLOSED);
                 return;
@@ -364,6 +377,8 @@ static const char *state_to_str(enum MQTTState state)
             return "MQTT_PING";
         case MQTT_ERROR:
             return "MQTT_ERROR";
+        case MQTT_PRE_CLOSING:
+            return "MQTT_PRE_CLOSING";
         case MQTT_CLOSING:
             return "MQTT_CLOSING";
         case MQTT_PUBLISH:
@@ -494,10 +509,10 @@ static void state_error(MQTTClient *ctx,
     if(first_time) {
         ctx->log_warning("MQTT: Error! Something went wrong...");
     }
-    set_state(ctx, MQTT_CLOSING);
+    set_state(ctx, MQTT_PRE_CLOSING);
 }
 
-static void state_closing(MQTTClient *ctx,
+static void state_pre_closing(MQTTClient *ctx,
         const bool first_time, const int incoming_packet_type)
 {
     uint8_t *buffer = buffered_write_ptr(&ctx->writer);
@@ -509,8 +524,17 @@ static void state_closing(MQTTClient *ctx,
 	int len = MQTTSerialize_disconnect(buffer, sizeof_buffer);
     if(buffered_write_commit(&ctx->writer, len)) {
 
-        ctx->socket.close(ctx->socket.ctx);
-        set_state(ctx, MQTT_CLOSED);
+        set_state(ctx, MQTT_CLOSING);
+    }
+}
+
+static void state_closing(MQTTClient *ctx,
+        const bool first_time, const int incoming_packet_type)
+{
+    if(buffered_write_flush(&ctx->writer) == 1) {
+        if(ctx->socket.close(ctx->socket.ctx)) {
+            set_state(ctx, MQTT_CLOSED);
+        }
     }
 }
 

@@ -3,9 +3,12 @@
 
 #include <stdbool.h>
 
+// returns false on failure
 typedef bool (*SocketOpenFunc)(void *void_ctx,
         const char *hostname, const int port);
-typedef void (*SocketCloseFunc)(void *void_ctx);
+
+// try again when it returns false
+typedef bool (*SocketCloseFunc)(void *void_ctx);
 
 // these return -1 for error, 0 for call again, or the number of bytes read
 typedef int (*SocketReadFunc)(void *void_ctx,
