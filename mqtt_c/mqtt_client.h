@@ -121,6 +121,13 @@ void MQTT_client_set_logging(MQTTClient *ctx,
 /**
  * Connect the client to the broker
  * 
+ * @param hostname      Server hostname to connect to (e.g. 'example.com').
+ *
+ *                      NOTE: the hostname string should stay valid during
+ *                      the lifetime of the MQTTClient object. For example,
+ *                      it will be accessed after MQTT_client_connect() returns.
+ *
+ *
  * @param client_id     A unique identifier for this client.
  *                      For example: use a device serial number,
  *                      or randomly generated string. It is recommended to
